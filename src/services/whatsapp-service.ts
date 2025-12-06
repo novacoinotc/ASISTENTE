@@ -6,7 +6,7 @@ import { getWhatsAppBrainBridge, AnalysisResult } from './whatsapp-brain-bridge'
 import { ProcessedMessage } from './whatsapp-client';
 import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
-import { eq } from 'drizzle-orm';
+import { eq, or, ilike, sql } from 'drizzle-orm';
 
 // Importar schema (ajustar path según estructura)
 import {
@@ -89,6 +89,16 @@ app.use((req, res, next) => {
 // Bridge de WhatsApp
 const bridge = getWhatsAppBrainBridge();
 
+// Helper para limpiar números de teléfono
+function cleanPhoneNumber(phone: string): string {
+  // Quitar @s.whatsapp.net, @c.us, y sufijos como :96
+  return phone
+    .replace('@s.whatsapp.net', '')
+    .replace('@c.us', '')
+    .replace(/:\d+$/, '')  // Quitar :XX al final
+    .replace(/\D/g, '');   // Solo dejar números
+}
+
 // ============================================
 // CALLBACKS PARA GUARDAR EN BASE DE DATOS
 // ============================================
@@ -97,26 +107,44 @@ bridge.onTransaction = async (tx, message) => {
   try {
     // Buscar o crear contacto
     let contactId: number | null = null;
+    const cleanPhone = cleanPhoneNumber(message.sender);
 
-    if (tx.contactName) {
-      const existing = await db
+    if (tx.contactName || cleanPhone) {
+      // Buscar primero por teléfono (más confiable), luego por nombre
+      let existing = await db
         .select()
         .from(contacts)
-        .where(eq(contacts.name, tx.contactName))
+        .where(
+          or(
+            cleanPhone ? eq(contacts.phone, cleanPhone) : sql`false`,
+            tx.contactName ? ilike(contacts.name, tx.contactName) : sql`false`
+          )
+        )
         .limit(1);
 
       if (existing.length > 0) {
         contactId = existing[0].id;
+        console.log(`   👤 Contacto existente: ${existing[0].name} (ID: ${contactId})`);
+
+        // Actualizar nombre si es diferente y tenemos uno nuevo
+        if (tx.contactName && existing[0].name !== tx.contactName) {
+          await db
+            .update(contacts)
+            .set({ name: tx.contactName, updatedAt: new Date() })
+            .where(eq(contacts.id, contactId));
+          console.log(`   📝 Nombre actualizado: ${existing[0].name} → ${tx.contactName}`);
+        }
       } else {
+        // Crear nuevo contacto solo si no existe
         const newContact = await db
           .insert(contacts)
           .values({
-            name: tx.contactName,
-            phone: message.sender.replace('@s.whatsapp.net', ''),
+            name: tx.contactName || `Contacto ${cleanPhone}`,
+            phone: cleanPhone,
           })
           .returning();
         contactId = newContact[0].id;
-        console.log(`   👤 Nuevo contacto creado: ${tx.contactName}`);
+        console.log(`   👤 Nuevo contacto creado: ${tx.contactName} (Tel: ${cleanPhone})`);
       }
     }
 
