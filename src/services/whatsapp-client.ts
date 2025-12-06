@@ -7,7 +7,6 @@ import makeWASocket, {
   getContentType,
   WAMessage,
   MessageUpsertType,
-  fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
