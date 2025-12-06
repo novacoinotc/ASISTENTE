@@ -7,6 +7,8 @@ import makeWASocket, {
   getContentType,
   WAMessage,
   MessageUpsertType,
+  fetchLatestBaileysVersion,
+  makeCacheableSignalKeyStore,
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
@@ -19,10 +21,17 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 
 const logger = pino({ level: 'silent' });
 
+// Helper to add random delay
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const randomDelay = (min: number, max: number) => delay(min + Math.random() * (max - min));
+
 // Configurar proxy si está definido
-function getProxyAgent() {
+function getProxyAgent(useProxy: boolean = true) {
   const proxyUrl = process.env.PROXY_URL;
-  if (!proxyUrl) return undefined;
+  if (!proxyUrl || !useProxy) {
+    console.log('🌐 Conectando directamente (sin proxy)');
+    return undefined;
+  }
 
   console.log('🌐 Usando proxy:', proxyUrl.replace(/:[^:]+@/, ':***@'));
 
@@ -62,7 +71,8 @@ export class WhatsAppClient extends EventEmitter {
   private qrCode: string | null = null;
   private isConnected: boolean = false;
   private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
+  private maxReconnectAttempts: number = 10;
+  private useProxy: boolean = true;  // Start with proxy, fallback to direct
 
   constructor(authFolder: string = './whatsapp-auth') {
     super();
@@ -76,20 +86,48 @@ export class WhatsAppClient extends EventEmitter {
 
   async connect(): Promise<void> {
     try {
+      // Add initial random delay to avoid detection
+      if (this.reconnectAttempts > 0) {
+        const delayMs = Math.min(30000, 5000 * Math.pow(1.5, this.reconnectAttempts - 1));
+        console.log(`⏳ Esperando ${Math.round(delayMs / 1000)}s antes de reconectar...`);
+        await randomDelay(delayMs, delayMs * 1.5);
+      }
+
       const { state, saveCreds } = await useMultiFileAuthState(this.authFolder);
 
-      const agent = getProxyAgent();
+      // Toggle proxy usage on consecutive failures
+      if (this.reconnectAttempts >= 3 && this.useProxy) {
+        console.log('🔄 Cambiando a conexión directa (sin proxy)...');
+        this.useProxy = false;
+      } else if (this.reconnectAttempts >= 6 && !this.useProxy) {
+        console.log('🔄 Intentando de nuevo con proxy...');
+        this.useProxy = true;
+      }
+
+      const agent = getProxyAgent(this.useProxy);
+
+      // Use a legitimate WhatsApp Web browser fingerprint
+      // Format: [platform, browser, version] - use real WhatsApp Web values
+      const browserFingerprint: [string, string, string] = ['Ubuntu', 'Chrome', '124.0.6367.207'];
 
       this.socket = makeWASocket({
-        auth: state,
-        printQRInTerminal: true,
+        auth: {
+          creds: state.creds,
+          keys: makeCacheableSignalKeyStore(state.keys, logger),
+        },
         logger,
-        browser: ['Asistente Financiero', 'Chrome', '120.0.0'],
-        connectTimeoutMs: 60000,
-        defaultQueryTimeoutMs: 60000,
-        keepAliveIntervalMs: 30000,
-        retryRequestDelayMs: 2000,
-        agent, // Usar proxy si está configurado
+        browser: browserFingerprint,
+        connectTimeoutMs: 120000,
+        defaultQueryTimeoutMs: 90000,
+        keepAliveIntervalMs: 25000,
+        retryRequestDelayMs: 3000,
+        agent,
+        // Don't mark as online immediately to reduce detection
+        markOnlineOnConnect: false,
+        // Generate proper link preview
+        generateHighQualityLinkPreview: false,
+        // Sync full history on first connect
+        syncFullHistory: false,
       });
 
       // Manejar actualización de credenciales
@@ -108,25 +146,55 @@ export class WhatsAppClient extends EventEmitter {
 
         if (connection === 'close') {
           this.isConnected = false;
-          const shouldReconnect =
-            (lastDisconnect?.error as Boom)?.output?.statusCode !==
-            DisconnectReason.loggedOut;
+          const error = lastDisconnect?.error as Boom;
+          const statusCode = error?.output?.statusCode;
+          const errorData = error?.data as { reason?: string } | undefined;
 
-          console.log('❌ Conexión cerrada:', lastDisconnect?.error);
+          // Check if we should reconnect
+          const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+          // Log detailed error info
+          console.log('❌ Conexión cerrada:', error?.message || 'Unknown error');
+          if (statusCode) {
+            console.log(`   📊 Status: ${statusCode}, Reason: ${errorData?.reason || 'N/A'}`);
+          }
+
+          // Handle 405 specifically - usually means IP/fingerprint blocked
+          if (statusCode === 405) {
+            console.log('⚠️  Error 405: WhatsApp rechazó la conexión.');
+            console.log('   Posibles causas: IP bloqueada, fingerprint detectado, o rate limiting.');
+          }
 
           if (shouldReconnect && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.reconnectAttempts++;
-            console.log(`🔄 Reconectando... intento ${this.reconnectAttempts}`);
-            setTimeout(() => this.connect(), 5000);
+            const baseDelay = Math.min(60000, 10000 * Math.pow(1.3, this.reconnectAttempts - 1));
+            const jitter = Math.random() * 5000;
+            const reconnectDelay = baseDelay + jitter;
+
+            console.log(`🔄 Reconectando... intento ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+            console.log(`   ⏱️  Próximo intento en ${Math.round(reconnectDelay / 1000)}s`);
+
+            setTimeout(() => this.connect(), reconnectDelay);
           } else if (!shouldReconnect) {
             console.log('🚪 Sesión cerrada. Necesitas escanear QR de nuevo.');
+            // Clear auth folder to force new QR
+            this.clearAuthState();
             this.emit('logout');
+          } else {
+            console.log('❌ Máximo de intentos de reconexión alcanzado.');
+            console.log('💡 Sugerencias:');
+            console.log('   1. Verifica que el proxy no esté bloqueado');
+            console.log('   2. Intenta sin proxy (quita PROXY_URL)');
+            console.log('   3. Espera unos minutos antes de reintentar');
+            this.emit('max-retries-reached');
           }
         } else if (connection === 'open') {
           this.isConnected = true;
           this.reconnectAttempts = 0;
+          this.useProxy = !!process.env.PROXY_URL; // Reset to default
           this.qrCode = null;
           console.log('✅ Conectado a WhatsApp');
+          console.log(`   🔗 Modo: ${this.useProxy ? 'via proxy' : 'conexión directa'}`);
           this.emit('connected');
         }
       });
@@ -337,6 +405,21 @@ export class WhatsAppClient extends EventEmitter {
     };
   }
 
+  // Limpiar estado de autenticación
+  private clearAuthState(): void {
+    try {
+      if (fs.existsSync(this.authFolder)) {
+        const files = fs.readdirSync(this.authFolder);
+        for (const file of files) {
+          fs.unlinkSync(path.join(this.authFolder, file));
+        }
+        console.log('🗑️  Estado de autenticación limpiado');
+      }
+    } catch (error) {
+      console.error('Error limpiando auth state:', error);
+    }
+  }
+
   // Desconectar
   async disconnect(): Promise<void> {
     if (this.socket) {
@@ -344,6 +427,23 @@ export class WhatsAppClient extends EventEmitter {
       this.socket = null;
       this.isConnected = false;
     }
+  }
+
+  // Forzar reconexión con nuevo estado
+  async forceReconnect(): Promise<void> {
+    console.log('🔄 Forzando reconexión limpia...');
+    this.reconnectAttempts = 0;
+    this.useProxy = !this.useProxy; // Toggle proxy mode
+    if (this.socket) {
+      try {
+        this.socket.end(undefined);
+      } catch (e) {
+        // Ignore errors on forced close
+      }
+      this.socket = null;
+    }
+    await delay(2000);
+    await this.connect();
   }
 }
 
