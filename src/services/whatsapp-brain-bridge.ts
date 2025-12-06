@@ -250,33 +250,69 @@ Analiza este mensaje y extrae información financiera.`;
     try {
       const base64 = buffer.toString('base64');
 
+      const imageAnalysisPrompt = `Eres un experto en detectar comprobantes de pago y transferencias bancarias.
+
+ANALIZA ESTA IMAGEN CON MUCHO CUIDADO. Busca CUALQUIER indicio de que sea un comprobante:
+
+TIPOS DE COMPROBANTES A DETECTAR:
+1. SPEI/Transferencias bancarias (BBVA, Banorte, Santander, Banamex, HSBC, Scotiabank, Banco Azteca, etc.)
+2. Screenshots de apps bancarias mostrando transferencias realizadas/recibidas
+3. CoDi / Transferencias QR
+4. Pagos en OXXO, 7-Eleven, depósitos en tiendas
+5. Mercado Pago, PayPal, Kueski, Nu, Klar, Stori, Hey Banco
+6. Recibos de Western Union, MoneyGram, Elektra
+7. Comprobantes de crypto (Binance, Bitso, etc.)
+8. Tickets/vouchers de cajero automático
+9. Recibos de pago de servicios (luz, agua, gas, teléfono)
+10. Cualquier imagen con: monto, fecha, referencia, folio, número de operación
+
+SEÑALES DE UN COMPROBANTE (busca CUALQUIERA de estas):
+- Palabras: "Transferencia", "Operación exitosa", "Comprobante", "Referencia", "Folio", "Monto", "Beneficiario", "Ordenante", "Cuenta destino", "CLABE", "Número de autorización", "Confirmación", "Pago realizado", "Depósito", "Enviaste", "Recibiste"
+- Logos de bancos mexicanos
+- Formato típico de recibo (fecha, hora, monto, referencia)
+- Números de cuenta o CLABE (18 dígitos)
+- Símbolos de pesos ($) o USD
+- Códigos QR de pago
+- Sellos de "Pagado" o "Exitoso"
+
+SI ENCUENTRAS UN COMPROBANTE, responde EXACTAMENTE así:
+[COMPROBANTE] Monto: $X, Banco/Plataforma: Y, Referencia: Z, Beneficiario: W
+
+SI NO ES un comprobante financiero (fotos personales, memes, etc.), responde:
+[NO FINANCIERO]
+
+IMPORTANTE:
+- Si hay CUALQUIER duda, asume que ES un comprobante y extrae la información
+- Es mejor detectar de más que perder un comprobante real
+- Los montos pueden estar en MXN, USD, USDT, etc.
+${caption ? `\nCaption del mensaje: ${caption}` : ''}`;
+
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',  // Usar modelo más potente para análisis de imágenes
         messages: [
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: `Analiza esta imagen. Si es un comprobante de transferencia/pago, responde con este formato exacto:
-[COMPROBANTE] Monto: $X, Banco: Y, Referencia: Z
-
-Si NO es un comprobante financiero, responde: [NO FINANCIERO]
-${caption ? `Caption: ${caption}` : ''}`,
+                text: imageAnalysisPrompt,
               },
               {
                 type: 'image_url',
                 image_url: {
                   url: `data:${mimeType};base64,${base64}`,
+                  detail: 'high',  // Análisis de alta resolución
                 },
               },
             ],
           },
         ],
-        max_tokens: 1000,
+        max_tokens: 1500,
       });
 
-      return response.choices[0].message.content || '[Imagen no analizable]';
+      const result = response.choices[0].message.content || '[Imagen no analizable]';
+      console.log(`🖼️ Análisis de imagen: ${result.substring(0, 100)}...`);
+      return result;
     } catch (error) {
       console.error('Error analizando imagen:', error);
       return `[Imagen] ${caption || ''}`;
