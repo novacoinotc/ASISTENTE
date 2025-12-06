@@ -234,7 +234,7 @@ ${contextText}
 Analiza este mensaje y extrae información financiera.`;
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: BRAIN_PROMPT },
           { role: 'user', content: prompt },
@@ -278,7 +278,7 @@ Analiza este mensaje y extrae información financiera.`;
       const base64 = buffer.toString('base64');
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-4-vision-preview',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'user',
