@@ -71,7 +71,7 @@ export class WhatsAppClient extends EventEmitter {
   private isConnected: boolean = false;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 10;
-  private useProxy: boolean = false;  // Start with direct connection, proxy as fallback
+  private useProxy: boolean = true;  // Start with proxy (Guadalajara residential IP)
 
   constructor(authFolder: string = './whatsapp-auth') {
     super();
@@ -95,13 +95,13 @@ export class WhatsAppClient extends EventEmitter {
       const { state, saveCreds } = await useMultiFileAuthState(this.authFolder);
 
       // Toggle proxy usage on consecutive failures
-      // Start with direct connection, then try proxy as fallback
-      if (this.reconnectAttempts >= 3 && !this.useProxy && process.env.PROXY_URL) {
-        console.log('🔄 Conexión directa falló. Intentando con proxy...');
-        this.useProxy = true;
-      } else if (this.reconnectAttempts >= 6 && this.useProxy) {
-        console.log('🔄 Proxy falló. Volviendo a conexión directa...');
+      // Start with proxy (Guadalajara residential IP), fallback to direct if needed
+      if (this.reconnectAttempts >= 3 && this.useProxy) {
+        console.log('🔄 Proxy falló. Intentando conexión directa...');
         this.useProxy = false;
+      } else if (this.reconnectAttempts >= 6 && !this.useProxy && process.env.PROXY_URL) {
+        console.log('🔄 Conexión directa falló. Volviendo a proxy...');
+        this.useProxy = true;
       }
 
       const agent = getProxyAgent(this.useProxy);
