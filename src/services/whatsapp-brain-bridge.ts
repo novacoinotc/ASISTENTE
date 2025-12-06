@@ -18,32 +18,24 @@ const CONFIG = {
 };
 
 // El prompt del cerebro para analizar mensajes
-const BRAIN_PROMPT = `Eres un asistente financiero que analiza mensajes de WhatsApp.
-SOLO registras transacciones 100% CONFIRMADAS con evidencia (comprobantes).
+const BRAIN_PROMPT = `Analizas mensajes de WhatsApp para detectar transacciones CONFIRMADAS.
 
-REGLA MÁS IMPORTANTE - DIRECCIÓN DE LA TRANSACCIÓN:
-- Si dice "MENSAJE ENVIADO POR EL USUARIO" y hay comprobante = EXPENSE (el usuario pagó/envió dinero)
-- Si dice "MENSAJE RECIBIDO" y hay comprobante = INCOME (el usuario recibió dinero)
+REGLA #1 - NOMBRE DEL CONTACTO:
+El "contactName" SIEMPRE debe ser el valor de "Chat:" que aparece en el mensaje.
+NUNCA uses nombres de beneficiarios/ordenantes que aparezcan DENTRO de comprobantes bancarios.
+Ejemplo: Si Chat: ☂️ envía comprobante con beneficiario "Juan Pérez", contactName = "☂️" (NO "Juan Pérez")
 
-REGLAS DE QUÉ REGISTRAR:
-✅ REGISTRAR como transacción:
-   - Comprobante de transferencia/pago (imagen con monto visible)
-   - Confirmación explícita: "Listo, ya te mandé los $X"
+REGLA #2 - DIRECCIÓN:
+- "MENSAJE ENVIADO POR EL USUARIO" + comprobante = EXPENSE
+- "MENSAJE RECIBIDO" + comprobante = INCOME
 
-❌ NO REGISTRAR como transacción (ignorar o poner en reminders):
-   - Solicitudes: "¿Me prestas?", "Necesito X", "Préstame X"
-   - Condicionales: "Creo que sí ajusto", "Podría con X", "Te los mando"
-   - Preguntas: "¿A dónde te los mando?"
-   - Promesas futuras: "Mañana te pago"
-   - Audio/texto pidiendo dinero (NO es confirmación)
+REGLA #3 - SOLO COMPROBANTES:
+Solo registra transacciones si hay imagen de comprobante/transferencia.
+NO registres: solicitudes, preguntas, condicionales, audios pidiendo dinero.
 
-TIPOS DE TRANSACCIÓN:
-- income: Usuario RECIBIÓ dinero (comprobante enviado por CONTACTO)
-- expense: Usuario ENVIÓ dinero (comprobante enviado por USUARIO)
-- loan_given: Usuario prestó dinero Y HAY COMPROBANTE de que lo envió
-- loan_received: Usuario recibió préstamo Y HAY COMPROBANTE
-- loan_payment_received: Le pagaron deuda con COMPROBANTE
-- loan_payment_made: Pagó deuda con COMPROBANTE
+TIPOS:
+- income: Comprobante RECIBIDO de un contacto
+- expense: Comprobante ENVIADO por el usuario
 
 RESPONDE EN JSON:
 {
@@ -51,27 +43,25 @@ RESPONDE EN JSON:
   "confidence": 0.0-1.0,
   "transactions": [
     {
-      "type": "income|expense|loan_given|loan_received|loan_payment_received|loan_payment_made",
+      "type": "income|expense",
       "amount": 1000,
-      "currency": "MXN|USD|EUR|USDT|BTC",
-      "contactName": "nombre del chat/contacto",
-      "description": "breve descripción",
-      "category": "banco|crypto|divisas|prestamos|efectivo|otro",
+      "currency": "MXN",
+      "contactName": "VALOR DE Chat: (NO nombres del comprobante)",
+      "description": "transferencia bancaria",
+      "category": "banco",
       "status": "completed"
     }
   ],
   "reminders": [],
   "contacts": [],
-  "summary": "Resumen breve",
+  "summary": "Resumen",
   "shouldNotify": false,
   "notificationMessage": null
 }
 
-CRÍTICO:
-- Sin comprobante/evidencia = NO hay transacción
-- Solicitud de préstamo = NO es transacción
-- "MENSAJE ENVIADO POR EL USUARIO" + comprobante = EXPENSE
-- "MENSAJE RECIBIDO" + comprobante = INCOME`;
+IMPORTANTE:
+- contactName = valor de "Chat:", NUNCA nombres dentro del comprobante
+- Sin comprobante = hasFinancialContent: false`;
 
 export interface AnalysisResult {
   hasFinancialContent: boolean;
