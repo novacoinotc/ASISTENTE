@@ -137,8 +137,8 @@ bridge.onTransaction = async (tx, message) => {
 
     console.log(`   ✅ Transacción guardada #${newTx[0].id}`);
 
-    // Actualizar saldo si es préstamo
-    if (contactId && ['loan_given', 'loan_received', 'loan_payment_received', 'loan_payment_made'].includes(tx.type)) {
+    // Actualizar saldo del contacto
+    if (contactId) {
       await updateContactBalance(contactId, tx.type, tx.amount, tx.currency || 'MXN');
     }
 
@@ -250,6 +250,8 @@ bridge.onAnalysis = async (analysis: AnalysisResult, message: ProcessedMessage) 
 };
 
 // Función para actualizar saldos
+// theyOweMe = total que YO les he enviado (expense) - lo que ellos me deben
+// iOweThem = total que ELLOS me han enviado (income) - lo que yo les debo
 async function updateContactBalance(
   contactId: number,
   type: string,
@@ -267,6 +269,15 @@ async function updateContactBalance(
     let iOweThem = parseFloat(existing[0]?.iOweThem || '0');
 
     switch (type) {
+      case 'expense':
+        // Yo les envié dinero = ellos me deben
+        theyOweMe += amount;
+        break;
+      case 'income':
+        // Ellos me enviaron dinero = yo les debo (o me pagaron)
+        iOweThem += amount;
+        break;
+      // Mantener compatibilidad con tipos antiguos
       case 'loan_given':
         theyOweMe += amount;
         break;
@@ -281,6 +292,7 @@ async function updateContactBalance(
         break;
     }
 
+    // netBalance positivo = me deben, negativo = les debo
     const netBalance = theyOweMe - iOweThem;
 
     if (existing.length > 0) {
@@ -307,7 +319,7 @@ async function updateContactBalance(
         });
     }
 
-    console.log(`   💰 Saldo actualizado - Me deben: $${theyOweMe} | Debo: $${iOweThem}`);
+    console.log(`   💰 Saldo: Enviado: $${theyOweMe.toLocaleString()} | Recibido: $${iOweThem.toLocaleString()} | Neto: $${netBalance.toLocaleString()}`);
 
   } catch (error) {
     console.error('Error actualizando saldo:', error);
