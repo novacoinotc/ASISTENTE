@@ -12,7 +12,12 @@ export async function GET(request: NextRequest) {
     const withBalance = searchParams.get('withBalance') !== 'false';
     const onlyWithBalance = searchParams.get('onlyWithBalance') === 'true';
 
-    let query = db
+    // Construir condición where
+    const whereCondition = search
+      ? and(eq(contacts.isActive, true), like(contacts.name, `%${search}%`))
+      : eq(contacts.isActive, true);
+
+    const result = await db
       .select({
         contact: contacts,
         balance: contactBalances,
@@ -29,14 +34,8 @@ export async function GET(request: NextRequest) {
           eq(contactBalances.currency, 'MXN')
         )
       )
-      .where(contacts.isActive)
+      .where(whereCondition)
       .orderBy(desc(contacts.updatedAt));
-
-    if (search) {
-      query = query.where(like(contacts.name, `%${search}%`)) as typeof query;
-    }
-
-    const result = await query;
 
     // Filtrar y formatear
     let contactsWithBalance: ContactWithBalance[] = result.map(row => ({

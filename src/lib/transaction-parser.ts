@@ -1,9 +1,5 @@
-import OpenAI from 'openai';
+import { openai } from '@/lib/openai';
 import { ParsedTransaction, TransactionType, BusinessCategory, Currency } from '@/types';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 const SYSTEM_PROMPT = `Eres un asistente experto en finanzas que ayuda a interpretar transacciones financieras a partir de mensajes en lenguaje natural.
 

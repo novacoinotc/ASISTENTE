@@ -4,7 +4,7 @@ import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { getWhatsAppBrainBridge, AnalysisResult } from './whatsapp-brain-bridge';
 import { ProcessedMessage } from './whatsapp-client';
-import { neon } from '@neondatabase/serverless';
+import { neon, NeonQueryFunction } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
 
@@ -27,7 +27,7 @@ if (!DATABASE_URL) {
 }
 
 // Conexión a base de datos
-const sql = neon(DATABASE_URL);
+const sql = neon(DATABASE_URL) as NeonQueryFunction<boolean, boolean>;
 const db = drizzle(sql);
 
 // Express app para API y Socket.IO

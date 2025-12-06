@@ -2,11 +2,7 @@ import { db } from '@/db';
 import { contacts, transactions, contactBalances } from '@/db/schema';
 import { eq, desc, sql, and, gte } from 'drizzle-orm';
 import { addDays, getDay, getHours, format } from 'date-fns';
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { openai } from '@/lib/openai';
 
 // Tabla para almacenar patrones aprendidos (la creamos en schema después)
 export interface LearnedPattern {

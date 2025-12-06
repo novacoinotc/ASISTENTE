@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { openai } from '@/lib/openai';
 import { db } from '@/db';
 import {
   transactions,
@@ -8,10 +8,6 @@ import {
   whatsappMessages
 } from '@/db/schema';
 import { eq, desc, and, gte, sql } from 'drizzle-orm';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 // El cerebro central del asistente - entiende TODO y se adapta
 const BRAIN_SYSTEM_PROMPT = `Eres el asistente financiero personal más inteligente y autónomo del mundo. Tu nombre es "Asistente" y trabajas para un empresario que maneja múltiples negocios simultáneamente.

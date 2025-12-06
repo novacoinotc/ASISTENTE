@@ -1,9 +1,11 @@
 import { WhatsAppClient, ProcessedMessage, getWhatsAppClient } from './whatsapp-client';
-import OpenAI from 'openai';
+import { getOpenAI } from '../lib/openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy OpenAI client
+const openai = {
+  get chat() { return getOpenAI().chat; },
+  get audio() { return getOpenAI().audio; }
+};
 
 // Configuración
 const CONFIG = {
@@ -312,8 +314,9 @@ Describe todo lo que ves de forma estructurada.`,
 
   private async transcribeAudio(buffer: Buffer, mimeType: string): Promise<string> {
     try {
-      // Crear un archivo temporal para Whisper
-      const audioFile = new File([buffer], 'audio.ogg', { type: mimeType });
+      // Crear un archivo temporal para Whisper (convertir Buffer a Uint8Array)
+      const uint8Array = new Uint8Array(buffer);
+      const audioFile = new File([uint8Array], 'audio.ogg', { type: mimeType });
 
       const response = await openai.audio.transcriptions.create({
         file: audioFile,

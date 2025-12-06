@@ -1,8 +1,4 @@
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { openai } from '@/lib/openai';
 
 export interface MediaProcessingResult {
   success: boolean;
@@ -132,8 +128,9 @@ export async function transcribeAudio(
   mimeType: string = 'audio/ogg'
 ): Promise<MediaProcessingResult> {
   try {
-    // Crear un File-like object para la API
-    const audioFile = new File([audioBuffer], 'audio.ogg', { type: mimeType });
+    // Crear un File-like object para la API (convertir Buffer a Uint8Array para compatibilidad)
+    const uint8Array = new Uint8Array(audioBuffer);
+    const audioFile = new File([uint8Array], 'audio.ogg', { type: mimeType });
 
     const response = await openai.audio.transcriptions.create({
       file: audioFile,

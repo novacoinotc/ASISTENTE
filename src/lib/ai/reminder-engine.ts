@@ -3,11 +3,7 @@ import { alerts, contacts, contactBalances, transactions } from '@/db/schema';
 import { eq, and, lt, gte, desc, sql, isNull } from 'drizzle-orm';
 import { addDays, startOfDay, endOfDay, format, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import OpenAI from 'openai';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { openai } from '@/lib/openai';
 
 export interface SmartReminder {
   id?: number;

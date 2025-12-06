@@ -330,8 +330,8 @@ function isQuestion(text: string): boolean {
   return questionPatterns.some(pattern => pattern.test(text.trim()));
 }
 
-// Endpoint especial para enviar resumen diario (llamar desde cron)
-export async function sendDailySummary(phoneNumber: string) {
+// Función interna para enviar resumen diario (usada por /api/cron/daily-summary)
+async function sendDailySummary(phoneNumber: string) {
   const summary = await reminderEngine.generateAndSendDailySummary();
   await sendWhatsAppMessage(phoneNumber, summary);
 }
