@@ -105,47 +105,29 @@ function cleanPhoneNumber(phone: string): string {
 
 bridge.onTransaction = async (tx, message) => {
   try {
-    // Buscar o crear contacto
+    // Buscar o crear contacto usando UPSERT para evitar duplicados
     let contactId: number | null = null;
     const cleanPhone = cleanPhoneNumber(message.sender);
 
-    if (tx.contactName || cleanPhone) {
-      // Buscar primero por teléfono (más confiable), luego por nombre
-      let existing = await db
-        .select()
-        .from(contacts)
-        .where(
-          or(
-            cleanPhone ? eq(contacts.phone, cleanPhone) : sql`false`,
-            tx.contactName ? ilike(contacts.name, tx.contactName) : sql`false`
-          )
-        )
-        .limit(1);
+    if (cleanPhone) {
+      // Usar upsert: insertar si no existe, actualizar si existe (por teléfono)
+      const result = await db
+        .insert(contacts)
+        .values({
+          name: tx.contactName || `Contacto ${cleanPhone}`,
+          phone: cleanPhone,
+        })
+        .onConflictDoUpdate({
+          target: contacts.phone,
+          set: {
+            name: tx.contactName || sql`${contacts.name}`,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
 
-      if (existing.length > 0) {
-        contactId = existing[0].id;
-        console.log(`   👤 Contacto existente: ${existing[0].name} (ID: ${contactId})`);
-
-        // Actualizar nombre si es diferente y tenemos uno nuevo
-        if (tx.contactName && existing[0].name !== tx.contactName) {
-          await db
-            .update(contacts)
-            .set({ name: tx.contactName, updatedAt: new Date() })
-            .where(eq(contacts.id, contactId));
-          console.log(`   📝 Nombre actualizado: ${existing[0].name} → ${tx.contactName}`);
-        }
-      } else {
-        // Crear nuevo contacto solo si no existe
-        const newContact = await db
-          .insert(contacts)
-          .values({
-            name: tx.contactName || `Contacto ${cleanPhone}`,
-            phone: cleanPhone,
-          })
-          .returning();
-        contactId = newContact[0].id;
-        console.log(`   👤 Nuevo contacto creado: ${tx.contactName} (Tel: ${cleanPhone})`);
-      }
+      contactId = result[0].id;
+      console.log(`   👤 Contacto: ${result[0].name} (ID: ${contactId}, Tel: ${cleanPhone})`);
     }
 
     // Crear transacción

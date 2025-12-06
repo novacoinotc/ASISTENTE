@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, decimal, integer, boolean, pgEnum } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, decimal, integer, boolean, pgEnum, uniqueIndex } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // Enums
@@ -51,7 +51,9 @@ export const contacts = pgTable('contacts', {
   isActive: boolean('is_active').default(true),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-});
+}, (table) => ({
+  phoneIdx: uniqueIndex('contacts_phone_unique').on(table.phone),
+}));
 
 // Tabla de transacciones
 export const transactions = pgTable('transactions', {
