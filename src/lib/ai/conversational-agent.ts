@@ -1,14 +1,10 @@
-import OpenAI from 'openai';
+import { openai } from '@/lib/openai';
 import { db } from '@/db';
 import { contacts, transactions, contactBalances, alerts } from '@/db/schema';
 import { eq, desc, sql, and, like, gte, lte } from 'drizzle-orm';
 import { format, startOfDay, endOfDay, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 export interface ConversationMessage {
   role: 'user' | 'assistant';

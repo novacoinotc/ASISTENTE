@@ -1,9 +1,11 @@
 import { WhatsAppClient, ProcessedMessage, getWhatsAppClient } from './whatsapp-client';
-import OpenAI from 'openai';
+import { getOpenAI } from '../lib/openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy OpenAI client
+const openai = {
+  get chat() { return getOpenAI().chat; },
+  get audio() { return getOpenAI().audio; }
+};
 
 // Configuración
 const CONFIG = {
