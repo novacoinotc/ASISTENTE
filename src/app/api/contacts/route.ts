@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
           eq(contactBalances.currency, 'MXN')
         )
       )
-      .where(contacts.isActive)
+      .where(eq(contacts.isActive, true))
       .orderBy(desc(contacts.updatedAt));
 
     if (search) {
