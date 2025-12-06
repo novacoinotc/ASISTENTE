@@ -16,7 +16,7 @@
     "whatsapp:prod": "tsx src/services/whatsapp-service.ts"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "6.7.7",
+    "baileys": "^6.7.9",
     "https-proxy-agent": "^7.0.4",
     "socks-proxy-agent": "^8.0.2",
     "qrcode": "^1.5.3",
