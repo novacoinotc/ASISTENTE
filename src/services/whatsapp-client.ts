@@ -14,8 +14,24 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { EventEmitter } from 'events';
 import QRCode from 'qrcode';
+import { SocksProxyAgent } from 'socks-proxy-agent';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 const logger = pino({ level: 'silent' });
+
+// Configurar proxy si está definido
+function getProxyAgent() {
+  const proxyUrl = process.env.PROXY_URL;
+  if (!proxyUrl) return undefined;
+
+  console.log('🌐 Usando proxy:', proxyUrl.replace(/:[^:]+@/, ':***@'));
+
+  if (proxyUrl.startsWith('socks')) {
+    return new SocksProxyAgent(proxyUrl);
+  } else {
+    return new HttpsProxyAgent(proxyUrl);
+  }
+}
 
 export interface ProcessedMessage {
   id: string;
@@ -62,6 +78,8 @@ export class WhatsAppClient extends EventEmitter {
     try {
       const { state, saveCreds } = await useMultiFileAuthState(this.authFolder);
 
+      const agent = getProxyAgent();
+
       this.socket = makeWASocket({
         auth: state,
         printQRInTerminal: true,
@@ -71,6 +89,7 @@ export class WhatsAppClient extends EventEmitter {
         defaultQueryTimeoutMs: 60000,
         keepAliveIntervalMs: 30000,
         retryRequestDelayMs: 2000,
+        agent, // Usar proxy si está configurado
       });
 
       // Manejar actualización de credenciales
