@@ -18,36 +18,29 @@ const CONFIG = {
 };
 
 // El prompt del cerebro para analizar mensajes
-const BRAIN_PROMPT = `Analizas mensajes de WhatsApp para detectar transacciones CONFIRMADAS.
+const BRAIN_PROMPT = `Analizas mensajes de WhatsApp para detectar transacciones.
 
-REGLA #1 - NOMBRE DEL CONTACTO:
-El "contactName" SIEMPRE debe ser el valor de "Chat:" que aparece en el mensaje.
-NUNCA uses nombres de beneficiarios/ordenantes que aparezcan DENTRO de comprobantes bancarios.
-Ejemplo: Si Chat: ☂️ envía comprobante con beneficiario "Juan Pérez", contactName = "☂️" (NO "Juan Pérez")
+CÓMO DETECTAR UN COMPROBANTE:
+Si el contenido empieza con "[COMPROBANTE]" significa que HAY un comprobante de pago.
+Si dice "[NO FINANCIERO]" o no tiene "[COMPROBANTE]", NO hay transacción.
 
-REGLA #2 - DIRECCIÓN:
-- "MENSAJE ENVIADO POR EL USUARIO" + comprobante = EXPENSE
-- "MENSAJE RECIBIDO" + comprobante = INCOME
-
-REGLA #3 - SOLO COMPROBANTES:
-Solo registra transacciones si hay imagen de comprobante/transferencia.
-NO registres: solicitudes, preguntas, condicionales, audios pidiendo dinero.
-
-TIPOS:
-- income: Comprobante RECIBIDO de un contacto
-- expense: Comprobante ENVIADO por el usuario
+REGLAS:
+1. contactName = el valor de "Chat:" (NUNCA nombres del comprobante)
+2. Si "MENSAJE ENVIADO POR EL USUARIO" + [COMPROBANTE] = type: "expense"
+3. Si "MENSAJE RECIBIDO" + [COMPROBANTE] = type: "income"
+4. Sin [COMPROBANTE] = hasFinancialContent: false
 
 RESPONDE EN JSON:
 {
   "hasFinancialContent": true/false,
-  "confidence": 0.0-1.0,
+  "confidence": 0.9,
   "transactions": [
     {
       "type": "income|expense",
       "amount": 1000,
       "currency": "MXN",
-      "contactName": "VALOR DE Chat: (NO nombres del comprobante)",
-      "description": "transferencia bancaria",
+      "contactName": "valor de Chat:",
+      "description": "transferencia",
       "category": "banco",
       "status": "completed"
     }
@@ -57,11 +50,7 @@ RESPONDE EN JSON:
   "summary": "Resumen",
   "shouldNotify": false,
   "notificationMessage": null
-}
-
-IMPORTANTE:
-- contactName = valor de "Chat:", NUNCA nombres dentro del comprobante
-- Sin comprobante = hasFinancialContent: false`;
+}`;
 
 export interface AnalysisResult {
   hasFinancialContent: boolean;
@@ -269,13 +258,11 @@ Analiza este mensaje y extrae información financiera.`;
             content: [
               {
                 type: 'text',
-                text: `Analiza esta imagen y extrae TODA la información financiera visible.
-Si es un comprobante: monto, fecha, referencia, banco, concepto.
-Si es una factura: total, conceptos, RFC.
-Si es un documento: información relevante.
-${caption ? `Caption: ${caption}` : ''}
+                text: `Analiza esta imagen. Si es un comprobante de transferencia/pago, responde con este formato exacto:
+[COMPROBANTE] Monto: $X, Banco: Y, Referencia: Z
 
-Describe todo lo que ves de forma estructurada.`,
+Si NO es un comprobante financiero, responde: [NO FINANCIERO]
+${caption ? `Caption: ${caption}` : ''}`,
               },
               {
                 type: 'image_url',
