@@ -8,7 +8,7 @@ import makeWASocket, {
   WAMessage,
   MessageUpsertType,
   makeCacheableSignalKeyStore,
-} from '@whiskeysockets/baileys';
+} from 'baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
 import * as fs from 'fs';
