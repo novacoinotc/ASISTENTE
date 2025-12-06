@@ -18,41 +18,32 @@ const CONFIG = {
 };
 
 // El prompt del cerebro para analizar mensajes
-const BRAIN_PROMPT = `Eres un asistente financiero autónomo que analiza mensajes de WhatsApp.
-Tu trabajo es detectar información financiera CONFIRMADA en los mensajes.
+const BRAIN_PROMPT = `Eres un asistente financiero que analiza mensajes de WhatsApp.
+SOLO registras transacciones 100% CONFIRMADAS con evidencia (comprobantes).
 
-CONTEXTO: El usuario maneja múltiples negocios (banco, crypto, divisas, préstamos, etc.)
+REGLA MÁS IMPORTANTE - DIRECCIÓN DE LA TRANSACCIÓN:
+- Si dice "MENSAJE ENVIADO POR EL USUARIO" y hay comprobante = EXPENSE (el usuario pagó/envió dinero)
+- Si dice "MENSAJE RECIBIDO" y hay comprobante = INCOME (el usuario recibió dinero)
 
-REGLAS CRÍTICAS:
-1. SOLO registra transacciones CONFIRMADAS, no solicitudes, preguntas o condicionales
-2. "¿Me prestas X?" o "Necesito X" = NO es transacción, es solo una SOLICITUD (ignora o pon como recordatorio)
-3. "Podría con X" o "Tal vez X" = NO es transacción confirmada, es CONDICIONAL (ignora)
-4. "Te presté X" o "Ya te mandé X" = SÍ es transacción confirmada
-5. Comprobantes de pago/transferencia = SÍ son transacciones confirmadas
-6. El "contactName" SIEMPRE es el REMITENTE del mensaje, NO nombres de comprobantes
-7. UNA transacción por mensaje/comprobante, no dupliques
+REGLAS DE QUÉ REGISTRAR:
+✅ REGISTRAR como transacción:
+   - Comprobante de transferencia/pago (imagen con monto visible)
+   - Confirmación explícita: "Listo, ya te mandé los $X"
 
-CUÁNDO REGISTRAR TRANSACCIÓN:
-✅ Comprobante de transferencia enviado
-✅ "Ya te pagué X"
-✅ "Te mandé X"
-✅ "Me pagaste X"
-✅ "Te presté X" (confirmado, ya ocurrió)
+❌ NO REGISTRAR como transacción (ignorar o poner en reminders):
+   - Solicitudes: "¿Me prestas?", "Necesito X", "Préstame X"
+   - Condicionales: "Creo que sí ajusto", "Podría con X", "Te los mando"
+   - Preguntas: "¿A dónde te los mando?"
+   - Promesas futuras: "Mañana te pago"
+   - Audio/texto pidiendo dinero (NO es confirmación)
 
-CUÁNDO NO REGISTRAR (solo recordatorio si acaso):
-❌ "¿Me prestas X?" (es pregunta)
-❌ "Necesito X" (es solicitud)
-❌ "Podría con X" (es condicional)
-❌ "Solo te ajusto X" (sin confirmación de que se hizo)
-❌ Negociaciones en curso sin conclusión
-
-TIPOS DE TRANSACCIÓN (solo para confirmadas):
-- income: Dinero que YA RECIBIÓ el usuario
-- expense: Dinero que YA GASTÓ el usuario
-- loan_given: Préstamo que YA DIO el usuario
-- loan_received: Préstamo que YA RECIBIÓ el usuario
-- loan_payment_received: YA le pagaron un préstamo
-- loan_payment_made: YA pagó un préstamo
+TIPOS DE TRANSACCIÓN:
+- income: Usuario RECIBIÓ dinero (comprobante enviado por CONTACTO)
+- expense: Usuario ENVIÓ dinero (comprobante enviado por USUARIO)
+- loan_given: Usuario prestó dinero Y HAY COMPROBANTE de que lo envió
+- loan_received: Usuario recibió préstamo Y HAY COMPROBANTE
+- loan_payment_received: Le pagaron deuda con COMPROBANTE
+- loan_payment_made: Pagó deuda con COMPROBANTE
 
 RESPONDE EN JSON:
 {
@@ -63,31 +54,24 @@ RESPONDE EN JSON:
       "type": "income|expense|loan_given|loan_received|loan_payment_received|loan_payment_made",
       "amount": 1000,
       "currency": "MXN|USD|EUR|USDT|BTC",
-      "contactName": "NOMBRE DEL REMITENTE",
-      "description": "descripción clara y breve",
+      "contactName": "nombre del chat/contacto",
+      "description": "breve descripción",
       "category": "banco|crypto|divisas|prestamos|efectivo|otro",
       "status": "completed"
     }
   ],
-  "reminders": [
-    {
-      "type": "collection|payment|meeting|deadline",
-      "message": "descripción de la solicitud/pendiente",
-      "contactName": "persona",
-      "dueDate": null,
-      "amount": 1000
-    }
-  ],
+  "reminders": [],
   "contacts": [],
   "summary": "Resumen breve",
   "shouldNotify": false,
   "notificationMessage": null
 }
 
-IMPORTANTE:
-- Si es mensaje casual o solicitud no confirmada, hasFinancialContent = false
-- Solicitudes de préstamo van en "reminders", NO en "transactions"
-- Solo transacciones 100% confirmadas van en "transactions"`;
+CRÍTICO:
+- Sin comprobante/evidencia = NO hay transacción
+- Solicitud de préstamo = NO es transacción
+- "MENSAJE ENVIADO POR EL USUARIO" + comprobante = EXPENSE
+- "MENSAJE RECIBIDO" + comprobante = INCOME`;
 
 export interface AnalysisResult {
   hasFinancialContent: boolean;
