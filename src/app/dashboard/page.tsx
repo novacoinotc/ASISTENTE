@@ -258,7 +258,8 @@ export default function DashboardPage() {
             <div className="space-y-3">
               {Object.entries(displayMetrics.byCategory || {}).map(
                 ([category, data]) => {
-                  if (data.count === 0) return null;
+                  const categoryData = data as { income: number; expense: number; count: number };
+                  if (categoryData.count === 0) return null;
                   return (
                     <div
                       key={category}
@@ -273,19 +274,19 @@ export default function DashboardPage() {
                             {getCategoryName(category)}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            {data.count} operaciones
+                            {categoryData.count} operaciones
                           </p>
                         </div>
                       </div>
                       <div className="text-right">
-                        {data.income > 0 && (
+                        {categoryData.income > 0 && (
                           <p className="text-sm text-green-600">
-                            +{formatCurrency(data.income)}
+                            +{formatCurrency(categoryData.income)}
                           </p>
                         )}
-                        {data.expense > 0 && (
+                        {categoryData.expense > 0 && (
                           <p className="text-sm text-red-600">
-                            -{formatCurrency(data.expense)}
+                            -{formatCurrency(categoryData.expense)}
                           </p>
                         )}
                       </div>
