@@ -344,6 +344,19 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Force reconnection endpoint (useful when debugging connection issues)
+app.post('/api/reconnect', async (req, res) => {
+  console.log('🔄 Forzando reconexión por solicitud API...');
+  try {
+    // Access the underlying client to force reconnection
+    const client = require('./whatsapp-client').getWhatsAppClient();
+    await client.forceReconnect();
+    res.json({ success: true, message: 'Reconexión iniciada' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: String(error) });
+  }
+});
+
 // ============================================
 // SOCKET.IO EVENTS
 // ============================================
