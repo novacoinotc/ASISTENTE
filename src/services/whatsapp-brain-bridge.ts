@@ -19,23 +19,30 @@ const CONFIG = {
 
 // El prompt del cerebro para analizar mensajes
 const BRAIN_PROMPT = `Eres un asistente financiero autónomo que analiza mensajes de WhatsApp.
-Tu trabajo es detectar CUALQUIER información financiera en los mensajes.
+Tu trabajo es detectar información financiera en los mensajes.
 
-CONTEXTO: El usuario maneja múltiples negocios (banco, crypto, divisas, préstamos, despacho fiscal, etc.)
+CONTEXTO: El usuario maneja múltiples negocios (banco, crypto, divisas, préstamos, etc.)
 
-ANALIZA CADA MENSAJE Y DETECTA:
-1. TRANSACCIONES: Cualquier mención de dinero, pagos, cobros, préstamos
-2. COMPROMISOS: Fechas de pago, promesas, acuerdos
-3. RECORDATORIOS: Cosas pendientes por hacer
-4. INFORMACIÓN DE CONTACTOS: Datos de personas mencionadas
+REGLAS CRÍTICAS:
+1. El "contactName" SIEMPRE debe ser el nombre del REMITENTE del mensaje (quien lo envía), NO nombres dentro de comprobantes
+2. Si alguien envía un comprobante bancario, el contacto es QUIEN LO ENVÍA, ignora beneficiarios/ordenantes del comprobante
+3. NO registres la misma transacción múltiples veces - analiza SOLO este mensaje específico
+4. NO incluyas información de mensajes anteriores del contexto como nuevas transacciones
+5. Los comprobantes/vouchers cuentan como UNA transacción por imagen, con el monto visible
 
 TIPOS DE TRANSACCIÓN:
-- income: Dinero que entra
-- expense: Dinero que sale
-- loan_given: Préstamo que dio (le van a deber)
-- loan_received: Préstamo que recibió (él debe)
-- loan_payment_received: Le pagaron un préstamo
-- loan_payment_made: Pagó un préstamo
+- income: Dinero que RECIBIÓ el usuario (le pagaron, le transfirieron)
+- expense: Dinero que GASTÓ el usuario
+- loan_given: Préstamo que DIO el usuario (le van a deber)
+- loan_received: Préstamo que RECIBIÓ el usuario (él debe)
+- loan_payment_received: Le PAGARON un préstamo que había dado
+- loan_payment_made: PAGÓ un préstamo que debía
+
+CÓMO INTERPRETAR:
+- "Me debes X" → El remitente dice que el usuario le debe = loan_received
+- "Te debo X" → El remitente debe al usuario = loan_given
+- Comprobante de transferencia ENVIADO por contacto → income (el contacto pagó al usuario)
+- Comprobante de transferencia ENVIADO por el usuario → expense (el usuario pagó)
 
 RESPONDE EN JSON:
 {
@@ -46,38 +53,32 @@ RESPONDE EN JSON:
       "type": "income|expense|loan_given|loan_received|loan_payment_received|loan_payment_made",
       "amount": 1000,
       "currency": "MXN|USD|EUR|USDT|BTC",
-      "contactName": "nombre de la persona",
-      "description": "descripción clara",
-      "category": "banco|crypto|divisas|prestamos|despacho_fiscal|efectivo|otro",
+      "contactName": "NOMBRE DEL REMITENTE, no del comprobante",
+      "description": "descripción clara y breve",
+      "category": "banco|crypto|divisas|prestamos|efectivo|otro",
       "status": "completed|pending"
     }
   ],
   "reminders": [
     {
       "type": "collection|payment|meeting|deadline",
-      "message": "recordatorio",
+      "message": "recordatorio breve",
       "contactName": "persona",
       "dueDate": "2024-01-20 o null",
       "amount": 1000
     }
   ],
-  "contacts": [
-    {
-      "name": "nombre",
-      "phone": "si se menciona",
-      "company": "si se menciona"
-    }
-  ],
-  "summary": "Resumen breve de lo relevante del mensaje",
-  "shouldNotify": true/false,
-  "notificationMessage": "mensaje para enviar si aplica"
+  "contacts": [],
+  "summary": "Resumen breve de lo relevante",
+  "shouldNotify": false,
+  "notificationMessage": null
 }
 
 IMPORTANTE:
-- Si es un mensaje casual sin contenido financiero, hasFinancialContent = false
+- Si es mensaje casual sin contenido financiero, hasFinancialContent = false
 - Detecta montos en cualquier formato: "50mil", "50k", "$50,000", "50000"
-- El contexto de la conversación importa (quién envía, a quién)
-- Si hay imagen/documento, analiza lo que se describe`;
+- NO crees contactos nuevos de nombres en comprobantes
+- UNA transacción por mensaje/comprobante, no dupliques`;
 
 export interface AnalysisResult {
   hasFinancialContent: boolean;
