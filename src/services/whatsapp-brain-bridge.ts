@@ -18,66 +18,39 @@ const CONFIG = {
 };
 
 // El prompt del cerebro para analizar mensajes
-const BRAIN_PROMPT = `Eres un asistente financiero autónomo que analiza mensajes de WhatsApp.
-Tu trabajo es detectar CUALQUIER información financiera en los mensajes.
+const BRAIN_PROMPT = `Analizas mensajes de WhatsApp para detectar transacciones.
 
-CONTEXTO: El usuario maneja múltiples negocios (banco, crypto, divisas, préstamos, despacho fiscal, etc.)
+CÓMO DETECTAR UN COMPROBANTE:
+Si el contenido empieza con "[COMPROBANTE]" significa que HAY un comprobante de pago.
+Si dice "[NO FINANCIERO]" o no tiene "[COMPROBANTE]", NO hay transacción.
 
-ANALIZA CADA MENSAJE Y DETECTA:
-1. TRANSACCIONES: Cualquier mención de dinero, pagos, cobros, préstamos
-2. COMPROMISOS: Fechas de pago, promesas, acuerdos
-3. RECORDATORIOS: Cosas pendientes por hacer
-4. INFORMACIÓN DE CONTACTOS: Datos de personas mencionadas
-
-TIPOS DE TRANSACCIÓN:
-- income: Dinero que entra
-- expense: Dinero que sale
-- loan_given: Préstamo que dio (le van a deber)
-- loan_received: Préstamo que recibió (él debe)
-- loan_payment_received: Le pagaron un préstamo
-- loan_payment_made: Pagó un préstamo
+REGLAS:
+1. contactName = el valor de "Chat:" (NUNCA nombres del comprobante)
+2. Si "MENSAJE ENVIADO POR EL USUARIO" + [COMPROBANTE] = type: "expense"
+3. Si "MENSAJE RECIBIDO" + [COMPROBANTE] = type: "income"
+4. Sin [COMPROBANTE] = hasFinancialContent: false
 
 RESPONDE EN JSON:
 {
   "hasFinancialContent": true/false,
-  "confidence": 0.0-1.0,
+  "confidence": 0.9,
   "transactions": [
     {
-      "type": "income|expense|loan_given|loan_received|loan_payment_received|loan_payment_made",
+      "type": "income|expense",
       "amount": 1000,
-      "currency": "MXN|USD|EUR|USDT|BTC",
-      "contactName": "nombre de la persona",
-      "description": "descripción clara",
-      "category": "banco|crypto|divisas|prestamos|despacho_fiscal|efectivo|otro",
-      "status": "completed|pending"
+      "currency": "MXN",
+      "contactName": "valor de Chat:",
+      "description": "transferencia",
+      "category": "banco",
+      "status": "completed"
     }
   ],
-  "reminders": [
-    {
-      "type": "collection|payment|meeting|deadline",
-      "message": "recordatorio",
-      "contactName": "persona",
-      "dueDate": "2024-01-20 o null",
-      "amount": 1000
-    }
-  ],
-  "contacts": [
-    {
-      "name": "nombre",
-      "phone": "si se menciona",
-      "company": "si se menciona"
-    }
-  ],
-  "summary": "Resumen breve de lo relevante del mensaje",
-  "shouldNotify": true/false,
-  "notificationMessage": "mensaje para enviar si aplica"
-}
-
-IMPORTANTE:
-- Si es un mensaje casual sin contenido financiero, hasFinancialContent = false
-- Detecta montos en cualquier formato: "50mil", "50k", "$50,000", "50000"
-- El contexto de la conversación importa (quién envía, a quién)
-- Si hay imagen/documento, analiza lo que se describe`;
+  "reminders": [],
+  "contacts": [],
+  "summary": "Resumen",
+  "shouldNotify": false,
+  "notificationMessage": null
+}`;
 
 export interface AnalysisResult {
   hasFinancialContent: boolean;
@@ -234,7 +207,7 @@ ${contextText}
 Analiza este mensaje y extrae información financiera.`;
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: BRAIN_PROMPT },
           { role: 'user', content: prompt },
@@ -278,20 +251,18 @@ Analiza este mensaje y extrae información financiera.`;
       const base64 = buffer.toString('base64');
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-4-vision-preview',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'user',
             content: [
               {
                 type: 'text',
-                text: `Analiza esta imagen y extrae TODA la información financiera visible.
-Si es un comprobante: monto, fecha, referencia, banco, concepto.
-Si es una factura: total, conceptos, RFC.
-Si es un documento: información relevante.
-${caption ? `Caption: ${caption}` : ''}
+                text: `Analiza esta imagen. Si es un comprobante de transferencia/pago, responde con este formato exacto:
+[COMPROBANTE] Monto: $X, Banco: Y, Referencia: Z
 
-Describe todo lo que ves de forma estructurada.`,
+Si NO es un comprobante financiero, responde: [NO FINANCIERO]
+${caption ? `Caption: ${caption}` : ''}`,
               },
               {
                 type: 'image_url',
