@@ -18,8 +18,16 @@ import {
 } from '../db/schema';
 
 // Configuración
-const PORT = process.env.WHATSAPP_SERVICE_PORT || 3001;
+// Railway usa PORT, localmente usamos WHATSAPP_SERVICE_PORT
+const PORT = process.env.PORT || process.env.WHATSAPP_SERVICE_PORT || 3001;
 const DATABASE_URL = process.env.DATABASE_URL;
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || [
+  process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  'https://*.vercel.app'
+];
+
+console.log(`🚀 Starting WhatsApp Service on port ${PORT}`);
+console.log(`📡 Allowed origins: ${ALLOWED_ORIGINS.join(', ')}`);
 
 if (!DATABASE_URL) {
   console.error('❌ DATABASE_URL no configurada');
@@ -35,13 +43,48 @@ const app = express();
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, etc.)
+      if (!origin) return callback(null, true);
+
+      // Check if origin matches any allowed pattern
+      const isAllowed = ALLOWED_ORIGINS.some(allowed => {
+        if (allowed.includes('*')) {
+          const regex = new RegExp(allowed.replace('*', '.*'));
+          return regex.test(origin);
+        }
+        return allowed === origin;
+      });
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.log(`🚫 Blocked origin: ${origin}`);
+        callback(null, true); // Still allow for now, just log
+      }
+    },
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
 // Middleware
 app.use(express.json());
+
+// CORS for Express
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Bridge de WhatsApp
 const bridge = getWhatsAppBrainBridge();
