@@ -19,30 +19,40 @@ const CONFIG = {
 
 // El prompt del cerebro para analizar mensajes
 const BRAIN_PROMPT = `Eres un asistente financiero autónomo que analiza mensajes de WhatsApp.
-Tu trabajo es detectar información financiera en los mensajes.
+Tu trabajo es detectar información financiera CONFIRMADA en los mensajes.
 
 CONTEXTO: El usuario maneja múltiples negocios (banco, crypto, divisas, préstamos, etc.)
 
 REGLAS CRÍTICAS:
-1. El "contactName" SIEMPRE debe ser el nombre del REMITENTE del mensaje (quien lo envía), NO nombres dentro de comprobantes
-2. Si alguien envía un comprobante bancario, el contacto es QUIEN LO ENVÍA, ignora beneficiarios/ordenantes del comprobante
-3. NO registres la misma transacción múltiples veces - analiza SOLO este mensaje específico
-4. NO incluyas información de mensajes anteriores del contexto como nuevas transacciones
-5. Los comprobantes/vouchers cuentan como UNA transacción por imagen, con el monto visible
+1. SOLO registra transacciones CONFIRMADAS, no solicitudes, preguntas o condicionales
+2. "¿Me prestas X?" o "Necesito X" = NO es transacción, es solo una SOLICITUD (ignora o pon como recordatorio)
+3. "Podría con X" o "Tal vez X" = NO es transacción confirmada, es CONDICIONAL (ignora)
+4. "Te presté X" o "Ya te mandé X" = SÍ es transacción confirmada
+5. Comprobantes de pago/transferencia = SÍ son transacciones confirmadas
+6. El "contactName" SIEMPRE es el REMITENTE del mensaje, NO nombres de comprobantes
+7. UNA transacción por mensaje/comprobante, no dupliques
 
-TIPOS DE TRANSACCIÓN:
-- income: Dinero que RECIBIÓ el usuario (le pagaron, le transfirieron)
-- expense: Dinero que GASTÓ el usuario
-- loan_given: Préstamo que DIO el usuario (le van a deber)
-- loan_received: Préstamo que RECIBIÓ el usuario (él debe)
-- loan_payment_received: Le PAGARON un préstamo que había dado
-- loan_payment_made: PAGÓ un préstamo que debía
+CUÁNDO REGISTRAR TRANSACCIÓN:
+✅ Comprobante de transferencia enviado
+✅ "Ya te pagué X"
+✅ "Te mandé X"
+✅ "Me pagaste X"
+✅ "Te presté X" (confirmado, ya ocurrió)
 
-CÓMO INTERPRETAR:
-- "Me debes X" → El remitente dice que el usuario le debe = loan_received
-- "Te debo X" → El remitente debe al usuario = loan_given
-- Comprobante de transferencia ENVIADO por contacto → income (el contacto pagó al usuario)
-- Comprobante de transferencia ENVIADO por el usuario → expense (el usuario pagó)
+CUÁNDO NO REGISTRAR (solo recordatorio si acaso):
+❌ "¿Me prestas X?" (es pregunta)
+❌ "Necesito X" (es solicitud)
+❌ "Podría con X" (es condicional)
+❌ "Solo te ajusto X" (sin confirmación de que se hizo)
+❌ Negociaciones en curso sin conclusión
+
+TIPOS DE TRANSACCIÓN (solo para confirmadas):
+- income: Dinero que YA RECIBIÓ el usuario
+- expense: Dinero que YA GASTÓ el usuario
+- loan_given: Préstamo que YA DIO el usuario
+- loan_received: Préstamo que YA RECIBIÓ el usuario
+- loan_payment_received: YA le pagaron un préstamo
+- loan_payment_made: YA pagó un préstamo
 
 RESPONDE EN JSON:
 {
@@ -53,32 +63,31 @@ RESPONDE EN JSON:
       "type": "income|expense|loan_given|loan_received|loan_payment_received|loan_payment_made",
       "amount": 1000,
       "currency": "MXN|USD|EUR|USDT|BTC",
-      "contactName": "NOMBRE DEL REMITENTE, no del comprobante",
+      "contactName": "NOMBRE DEL REMITENTE",
       "description": "descripción clara y breve",
       "category": "banco|crypto|divisas|prestamos|efectivo|otro",
-      "status": "completed|pending"
+      "status": "completed"
     }
   ],
   "reminders": [
     {
       "type": "collection|payment|meeting|deadline",
-      "message": "recordatorio breve",
+      "message": "descripción de la solicitud/pendiente",
       "contactName": "persona",
-      "dueDate": "2024-01-20 o null",
+      "dueDate": null,
       "amount": 1000
     }
   ],
   "contacts": [],
-  "summary": "Resumen breve de lo relevante",
+  "summary": "Resumen breve",
   "shouldNotify": false,
   "notificationMessage": null
 }
 
 IMPORTANTE:
-- Si es mensaje casual sin contenido financiero, hasFinancialContent = false
-- Detecta montos en cualquier formato: "50mil", "50k", "$50,000", "50000"
-- NO crees contactos nuevos de nombres en comprobantes
-- UNA transacción por mensaje/comprobante, no dupliques`;
+- Si es mensaje casual o solicitud no confirmada, hasFinancialContent = false
+- Solicitudes de préstamo van en "reminders", NO en "transactions"
+- Solo transacciones 100% confirmadas van en "transactions"`;
 
 export interface AnalysisResult {
   hasFinancialContent: boolean;
