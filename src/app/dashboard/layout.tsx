@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   PlusCircle,
+  Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Transacciones", href: "/dashboard/transactions", icon: ArrowLeftRight },
   { name: "Contactos", href: "/dashboard/contacts", icon: Users },
   { name: "Saldos", href: "/dashboard/balances", icon: Wallet },
+  { name: "WhatsApp", href: "/dashboard/whatsapp", icon: Smartphone },
   { name: "Mensajes", href: "/dashboard/messages", icon: MessageSquare },
 ];
 
